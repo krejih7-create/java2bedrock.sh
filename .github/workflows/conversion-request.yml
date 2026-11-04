@@ -30,20 +30,34 @@ jobs:
 
       - name: Organize Inputs
         id: organize-inputs
+        env:
+          ISSUE_DATA: ${{ steps.parse-issue.outputs.data }}
         run: |
-          echo '${{ toJSON(steps.parse-issue.outputs.data) }}' | jq '
-          def test_input($input; $default):
-          if ($input == "*No response*" or $input == "None") then $default else ($input | tostring | gsub("\\\\";"")) end;
-          {
-            "pack_url": .["java-pack-direct-download-url"].text[1:-1],
-            "default_pack_url": test_input(.["default-pack-direct-download-url"].text; " null ")[1:-1],
-            "merge_pack_url": test_input(.["bedrock-merge-pack-direct-download-url"].text; " null ")[1:-1],
-            "default_assets_version": test_input(.["default-assets-version"].text; "1.19.3"),
-            "block_material": test_input(.["block-material"].text; "alpha_test"),
-            "attachable_material": test_input(.["attachable-material"].text; "entity_alphatest_one_sided"),
-            "archive_scratch": test_input(.["archive-scratch-files"].text; "false"),
-            "rename_model_files": test_input(.["rename-model-files"].text; "false")
-          }' > inputs.json
+          printf '%s' "$ISSUE_DATA" | jq '
+            def test_input($input; $default):
+              if ($input == "*No response*" or $input == "None" or $input == null)
+              then $default
+              else ($input | tostring | gsub("\\\\"; ""))
+              end;
+
+            def get_url($input):
+              if ($input == "*No response*" or $input == "None" or $input == null)
+              then "null"
+              else
+                (try ($input | tostring | capture("(?<url>https?://[^ )>]+)").url) catch "null")
+              end;
+
+            {
+              "pack_url": get_url(.["java-pack-direct-download-url"].text),
+              "default_pack_url": get_url(.["default-pack-direct-download-url"].text),
+              "merge_pack_url": get_url(.["bedrock-merge-pack-direct-download-url"].text),
+              "default_assets_version": test_input(.["default-assets-version"].text; "1.19.3"),
+              "block_material": test_input(.["block-material"].text; "alpha_test"),
+              "attachable_material": test_input(.["attachable-material"].text; "entity_alphatest_one_sided"),
+              "archive_scratch": test_input(.["archive-scratch-files"].text; "false"),
+              "rename_model_files": test_input(.["rename-model-files"].text; "false")
+            }
+          ' > inputs.json
 
           echo "PACK_URL=$(jq -r '.pack_url' inputs.json)" >> "$GITHUB_OUTPUT"
           echo "DEFAULT_PACK_URL=$(jq -r '.default_pack_url' inputs.json)" >> "$GITHUB_OUTPUT"
@@ -53,6 +67,14 @@ jobs:
           echo "ATTACHABLE_MATERIAL=$(jq -r '.attachable_material' inputs.json)" >> "$GITHUB_OUTPUT"
           echo "ARCHIVE_SCRATCH=$(jq -r '.archive_scratch' inputs.json)" >> "$GITHUB_OUTPUT"
           echo "RENAME_MODEL_FILES=$(jq -r '.rename_model_files' inputs.json)" >> "$GITHUB_OUTPUT"
+
+          echo "Pack URL detected:"
+          jq -r '.pack_url' inputs.json
+
+          if [ "$(jq -r '.pack_url' inputs.json)" = "null" ]; then
+            echo "::error::Java Pack URL was not detected."
+            exit 1
+          fi
 
   convert-pack:
     runs-on: ubuntu-latest
@@ -118,7 +140,7 @@ jobs:
             MERGE_PACK_FILE="merge_pack.zip"
           fi
 
-          ./converter.sh input_pack.zip -w "false" -m ${MERGE_PACK_FILE} -a ${ATTACHABLE_MATERIAL} -b ${BLOCK_MATERIAL} -f ${DEFAULT_PACK_URL} -v ${DEFAULT_ASSETS_VERSION} -r ${RENAME_MODEL_FILES} -s ${ARCHIVE_SCRATCH} -u "true"
+          ./converter.sh input_pack.zip -w "false" -m "${MERGE_PACK_FILE}" -a "${ATTACHABLE_MATERIAL}" -b "${BLOCK_MATERIAL}" -f "${DEFAULT_PACK_URL}" -v "${DEFAULT_ASSETS_VERSION}" -r "${RENAME_MODEL_FILES}" -s "${ARCHIVE_SCRATCH}" -u "true"
 
       - name: Upload converted pack
         uses: actions/upload-artifact@v4
