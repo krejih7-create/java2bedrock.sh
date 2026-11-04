@@ -81,6 +81,12 @@ jobs:
           sudo apt-get install -y --fix-missing jq moreutils zip imagemagick ghostscript
           jq --version
           yarn global add spritesheet-js
+      - name: Install jq 1.6
+        run: |
+          sudo wget -O /usr/local/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
+          sudo chmod +x /usr/local/bin/jq
+          hash -r
+          jq --version
       - name: Convert Pack
         id: convert-pack
         continue-on-error: false
@@ -136,7 +142,7 @@ jobs:
 
             If you notice issues with the converted files, please refer to the action log for errors and open a bug report if you believe there is an issue with the converter. This issue will be closed automatically.
 
-            [1]: https://github.com/Kas-tle/java2bedrock.sh/actions/runs/${{ github.run_id}}
+            [1]: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id}}
           reactions: 'rocket'
       - name: Close Issue
         uses: peter-evans/close-issue@v2
@@ -166,7 +172,7 @@ jobs:
 
             If you believe this is an issue with the converter, please open a bug report. This issue will be closed automatically.
 
-            [1]: https://github.com/Kas-tle/java2bedrock.sh/actions/runs/${{ github.run_id}}
+            [1]: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id}}
           reactions: 'x'
       - name: Close Issue
         uses: peter-evans/close-issue@v2
